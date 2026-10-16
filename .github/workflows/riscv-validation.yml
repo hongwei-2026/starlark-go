@@ -1,0 +1,36 @@
+name: RISC-V validation
+
+on:
+  push:
+    branches:
+      - validation/660-riscv-runner
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04-riscv
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Confirm native RISC-V environment
+        run: |
+          uname -a
+          test "$(uname -m)" = riscv64
+          go version
+      - name: Verify TestIntFallback is explicitly skipped
+        shell: bash
+        run: |
+          set -o pipefail
+          output=$(go test ./starlark -run '^TestIntFallback$' -v -count=1 2>&1)
+          printf '%s\n' "$output"
+          grep -F -- '--- SKIP: TestIntFallback' <<<"$output"
+          grep -F -- 'requires the POSIX 64-bit Int optimization and ulimit -v' <<<"$output"
+      - name: Run complete test suite
+        run: go test ./...
